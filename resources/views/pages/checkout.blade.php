@@ -106,19 +106,22 @@
                 <div class="payment-methods">
                   <ul class="list-content">
                     @foreach($payment_methods as $key => $payment_method)
-                      @if($key == 0)
-                        <li class="active">
-                          <label>
-                            <input type="radio" value="{{ $payment_method->id }}" name="payment_method" checked>
-                            {{ $payment_method->name }}
-                          </label>
-                          <div class="box-content">
-                            <p>{{ $payment_method->describe }}</p>
-                          </div>
-                        </li>
-                     
-                      @endif
-                    @endforeach
+                    <li class="{{ $key == 0 ? 'active' : '' }}">
+                      <label>
+                        <input 
+                          type="radio" 
+                          value="{{ $payment_method->id }}" 
+                          name="payment_method" 
+                          {{ $key == 0 ? 'checked' : '' }}
+                        >
+                        {{ $payment_method->name }}
+                      </label>
+
+                      <div class="box-content">
+                        <p>{{ $payment_method->describe }}</p>
+                      </div>
+                    </li>
+                  @endforeach
                   </ul>
                 </div>
               </div>

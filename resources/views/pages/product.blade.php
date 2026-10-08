@@ -4,7 +4,7 @@
 
 @section('content')
 
-  <section class="bread-crumb">
+  <section class="bread-crumb">      
     <nav aria-label="breadcrumb">
       <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="{{ route('home_page') }}">{{ __('Trang Chủ') }}</a></li>
@@ -18,7 +18,7 @@
   <div class="site-product">
     <section class="section-advertise">
       <div class="content-advertise">
-        <div id="slide-advertise" class="owl-carousel">
+        <div id="slide-advertise" class="owl-carousel">    
           @foreach($data['advertises'] as $advertise)
             <div class="slide-advertise-inner" style="background-image: url('{{ Helper::get_image_advertise_url($advertise->image) }}');" data-dot="<button>{{ $advertise->title }}</button>"></div>
           @endforeach
@@ -28,7 +28,7 @@
 
     <section class="section-product">
       <div class="section-header">
-        <h2 class="section-title">{{ $data['product']->name }}</h2>
+        <h2 class="section-title">{{ $data['product']->name }}</h2>    
         <div class="section-sub-title">
           <div class="sku-code">Mã sản phẩm: <i>{{ $data['product']->sku_code }}</i></div>
           <div class="start-vote">{!! Helper::get_start_vote($data['product']->rate) !!}</div>
@@ -41,7 +41,7 @@
             <div class="col-md-9">
               <div class="row">
                 <div class="col-md-6 col-sm-6">
-                  <div class="image-product">
+                  <div class="image-product"> 
                     @foreach($data['product_details'] as $key => $product)
                       @if($key == 0)
                       <div class="image-gallery-{{ $key }}">
@@ -66,7 +66,7 @@
                 </div>
 
                 <div class="col-md-6 col-sm-6">
-                  <div class="price-product">
+                  <div class="price-product">         
                     @foreach($data['product_details'] as $key => $product)
                       @if($key)
                       <div class="product-{{ $key }}" style="display: none;">
@@ -117,7 +117,7 @@
                   </div>
                   @if($data['product']->promotions->isNotEmpty())
                     <div class="promotions">
-                      <div class="title">Khuyến mại đặc biệt</div>
+                      <div class="title">Khuyến mại đặc biệt</div>          
                       <ul class="content">
                         @foreach($data['product']->promotions as $promotion)
                           <li>{{ $promotion->content }}</li>
@@ -130,7 +130,7 @@
                       @csrf
                       <div class="row">
                         <div class="col-lg-4 col-md-4 col-sm-4 col-xs-4">
-                          <button type="submit" class="btn btn-lg btn-gray"><i class="far fa-money-bill-alt"></i> Mua ngay</button>
+                          <button type="submit" class="btn btn-lg btn-gray"><i class="far fa-money-bill-alt"></i> Mua ngay</button> 
                         </div>
                         <div class="col-lg-4 col-md-4 col-sm-4 col-xs-4">
                           <div class="form-center">

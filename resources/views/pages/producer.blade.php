@@ -25,7 +25,7 @@
       </div>
     </section>
 
-    <section class="section-filter">
+    <section class="section-filter"> 
       <div class="section-header">
         <h2 class="section-title">Tìm Kiếm Và Sắp Xếp</h2>
       </div>
@@ -87,7 +87,7 @@
       </div>
     </section>
 
-    <section class="section-products">
+    <section class="section-products">   
       <div class="section-header">
         <div class="section-header-left">
           <h2 class="section-title">{{ $producer->name }}</h2>
@@ -108,7 +108,7 @@
             <div class="content">Product Item Not Found</div>
           </div>
         @else
-          <div class="row">
+          <div class="row">  
             @foreach($data['products'] as $key => $product)
               <div class="col-md-2 col-md-20">
                 <div class="item-product">
@@ -116,7 +116,8 @@
                     <div class="row">
                       <div class="col-md-12 col-sm-12 col-xs-12">
                         <div class="image-product" style="background-image: url('{{ Helper::get_image_product_url($product->image) }}');padding-top: 100%;">
-                          {!! Helper::get_promotion_percent($product->product_detail->sale_price, $product->product_detail->promotion_price, $product->product_detail->promotion_start_date, $product->product_detail->promotion_end_date) !!}
+                          {!! Helper::get_promotion_percent($product->product_detail->sale_price, $product->product_detail->promotion_price,
+                           $product->product_detail->promotion_start_date, $product->product_detail->promotion_end_date) !!}  
                         </div>
                         <div class="content-product">
                           <h3 class="title">{{ $product->name }}</h3>
@@ -124,11 +125,12 @@
                             {!! Helper::get_start_vote($product->rate) !!}
                           </div>
                           <div class="price">
-                            {!! Helper::get_real_price($product->product_detail->sale_price, $product->product_detail->promotion_price, $product->product_detail->promotion_start_date, $product->product_detail->promotion_end_date) !!}
+                            {!! Helper::get_real_price($product->product_detail->sale_price, $product->product_detail->promotion_price,
+                             $product->product_detail->promotion_start_date, $product->product_detail->promotion_end_date) !!}  
                           </div>
                         </div>
                       </div>
-                      <div class="col-md-12 col-sm-12 col-xs-12 animate">
+                      <div class="col-md-12 col-sm-12 col-xs-12 animate">    
                         <div class="product-details">
                           <p><strong><i class="fas fa-tv"></i> Màn Hình: </strong>{{ $product->monitor }}</p>
                           <p><strong><i class="fas fa-camera-retro"></i> Camera Trước: </strong>{{ $product->front_camera }}</p>
@@ -156,14 +158,14 @@
         @endif
       </div>
       <div class="section-footer text-center">
-        {{ $data['products']->appends(Request::query())->links() }}
+        {{ $data['products']->appends(Request::query())->links() }}   
       </div>
     </section>
   </div>
 
 @endsection
 
-@section('css')
+@section('css')  
   <style>
     .slide-advertise-inner {
       background-repeat: no-repeat;
@@ -179,7 +181,7 @@
   </style>
 @endsection
 
-@section('js')
+@section('js') 
   <script>
     $(document).ready(function(){
 

@@ -7,6 +7,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use App\Mail\OrderSuccessMail;
 
 use App\Models\ProductDetail;
 use App\Models\Cart;
@@ -14,7 +17,7 @@ use App\Models\Advertise;
 use App\Models\PaymentMethod;
 use App\Models\Order;
 use App\Models\OrderDetail;
-use App\NL_Checkout;
+
 
 class CartController extends Controller
 {
@@ -164,219 +167,298 @@ class CartController extends Controller
   }
 
   public function payment(Request $request) {
-    $payment_method = PaymentMethod::select('id', 'name')->where('id', $request->payment_method)->first();
-    if(Str::contains($payment_method->name, 'COD')) {
-      if($request->buy_method == 'buy_now'){
-        $order = new Order;
-        $order->user_id = Auth::user()->id;
-        $order->payment_method_id = $request->payment_method;
-        $order->order_code = 'PSO'.str_pad(rand(0, pow(10, 5) - 1), 5, '0', STR_PAD_LEFT);
-        $order->name = $request->name;
-        $order->email = $request->email;
-        $order->phone = $request->phone;
-        $order->address = $request->address;
-        $order->status = 1;
-        $order->save();
+  $payment_method = PaymentMethod::select('id', 'name')->where('id', $request->payment_method)->first();
 
+  if(!$payment_method) {
+    return redirect()->route('home_page')->with(['alert' => [
+      'type' => 'error',
+      'title' => 'Thông Báo',
+      'content' => 'Phương thức thanh toán không hợp lệ.'
+    ]]);
+  }
+
+  if(Str::contains($payment_method->name, 'COD')) {
+
+    if($request->buy_method == 'buy_now'){
+
+      $order = new Order;
+      $order->user_id = Auth::user()->id;
+      $order->payment_method_id = $request->payment_method;
+      $order->order_code = 'PSO'.str_pad(rand(0, pow(10, 5) - 1), 5, '0', STR_PAD_LEFT);
+      $order->name = $request->name;
+      $order->email = $request->email;
+      $order->phone = $request->phone;
+      $order->address = $request->address;
+      $order->status = 1;
+      $order->save();
+
+      $order_details = new OrderDetail;
+      $order_details->order_id = $order->id;
+      $order_details->product_detail_id = $request->product_id;
+      $order_details->quantity = $request->totalQty;
+      $order_details->price = $request->price;
+      $order_details->save();
+
+      $this->sendOrderSuccessMail($order);
+
+      $product = ProductDetail::find($request->product_id);
+      $product->quantity = $product->quantity - $request->totalQty;
+      $product->save();
+
+      return redirect()->route('home_page')->with(['alert' => [
+        'type' => 'success',
+        'title' => 'Mua hàng thành công',
+        'content' => 'Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi. Sản phẩm của bạn sẽ được chuyển đến trong thời gian sớm nhất.'
+      ]]);
+
+    } elseif ($request->buy_method == 'buy_cart') {
+
+      $cart = Session::get('cart');
+
+      $order = new Order;
+      $order->user_id = Auth::user()->id;
+      $order->payment_method_id = $request->payment_method;
+      $order->order_code = 'PSO'.str_pad(rand(0, pow(10, 5) - 1), 5, '0', STR_PAD_LEFT);
+      $order->name = $request->name;
+      $order->email = $request->email;
+      $order->phone = $request->phone;
+      $order->address = $request->address;
+      $order->status = 1;
+      $order->save();
+
+      foreach ($cart->items as $key => $item) {
         $order_details = new OrderDetail;
         $order_details->order_id = $order->id;
-        $order_details->product_detail_id = $request->product_id;
-        $order_details->quantity = $request->totalQty;
-        $order_details->price = $request->price;
+        $order_details->product_detail_id = $item['item']->id;
+        $order_details->quantity = $item['qty'];
+        $order_details->price = $item['price'];
         $order_details->save();
 
-        $product = ProductDetail::find($request->product_id);
-        $product->quantity = $product->quantity - $request->totalQty;
+        $product = ProductDetail::find($item['item']->id);
+        $product->quantity = $product->quantity - $item['qty'];
         $product->save();
-
-        return redirect()->route('home_page')->with(['alert' => [
-          'type' => 'success',
-          'title' => 'Mua hàng thành công',
-          'content' => 'Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi. Sản phẩm của bạn sẽ được chuyển đến trong thời gian sớm nhất.'
-        ]]);
-      } elseif ($request->buy_method == 'buy_cart') {
-        $cart = Session::get('cart');
-
-        $order = new Order;
-        $order->user_id = Auth::user()->id;
-        $order->payment_method_id = $request->payment_method;
-        $order->order_code = 'PSO'.str_pad(rand(0, pow(10, 5) - 1), 5, '0', STR_PAD_LEFT);
-        $order->name = $request->name;
-        $order->email = $request->email;
-        $order->phone = $request->phone;
-        $order->address = $request->address;
-        $order->status = 1;
-        $order->save();
-
-        foreach ($cart->items as $key => $item) {
-          $order_details = new OrderDetail;
-          $order_details->order_id = $order->id;
-          $order_details->product_detail_id = $item['item']->id;
-          $order_details->quantity = $item['qty'];
-          $order_details->price = $item['price'];
-          $order_details->save();
-
-          $product = ProductDetail::find($item['item']->id);
-          $product->quantity = $product->quantity - $item['qty'];
-          $product->save();
-        }
-        Session::forget('cart');
-        return redirect()->route('home_page')->with(['alert' => [
-          'type' => 'success',
-          'title' => 'Mua hàng thành công',
-          'content' => 'Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi. Sản phẩm của bạn sẽ được chuyển đến trong thời gian sớm nhất.'
-        ]]);
       }
-    } elseif(Str::contains($payment_method->name, 'Online Payment')) {
-      if($request->buy_method == 'buy_now'){
-        $order = new Order;
-        $order->user_id = Auth::user()->id;
-        $order->payment_method_id = $request->payment_method;
-        $order->order_code = 'PSO'.str_pad(rand(0, pow(10, 5) - 1), 5, '0', STR_PAD_LEFT);
-        $order->name = $request->name;
-        $order->email = $request->email;
-        $order->phone = $request->phone;
-        $order->address = $request->address;
-        $order->status = 0;
-        $order->save();
 
+      Session::forget('cart');
+
+      $this->sendOrderSuccessMail($order);
+
+      return redirect()->route('home_page')->with(['alert' => [
+        'type' => 'success',
+        'title' => 'Mua hàng thành công',
+        'content' => 'Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của chúng tôi. Sản phẩm của bạn sẽ được chuyển đến trong thời gian sớm nhất.'
+      ]]);
+    }
+
+  } elseif(Str::contains($payment_method->name, 'VNPAY') || Str::contains($payment_method->name, 'Online')) {
+
+    if($request->buy_method == 'buy_now'){
+
+      $order = new Order;
+      $order->user_id = Auth::user()->id;
+      $order->payment_method_id = $request->payment_method;
+      $order->order_code = 'PSO'.str_pad(rand(0, pow(10, 5) - 1), 5, '0', STR_PAD_LEFT);
+      $order->name = $request->name;
+      $order->email = $request->email;
+      $order->phone = $request->phone;
+      $order->address = $request->address;
+
+      // status = 0: đơn đã tạo nhưng chưa thanh toán thành công
+      $order->status = 0;
+      $order->save();
+
+      $order_details = new OrderDetail;
+      $order_details->order_id = $order->id;
+      $order_details->product_detail_id = $request->product_id;
+      $order_details->quantity = $request->totalQty;
+      $order_details->price = $request->price;
+      $order_details->save();
+
+      $totalAmount = $order_details->price * $order_details->quantity;
+
+      return $this->redirectToVnpay($request, $order, $totalAmount);
+
+    } elseif ($request->buy_method == 'buy_cart') {
+
+      $cart = Session::get('cart');
+
+      $order = new Order;
+      $order->user_id = Auth::user()->id;
+      $order->payment_method_id = $request->payment_method;
+      $order->order_code = 'PSO'.str_pad(rand(0, pow(10, 5) - 1), 5, '0', STR_PAD_LEFT);
+      $order->name = $request->name;
+      $order->email = $request->email;
+      $order->phone = $request->phone;
+      $order->address = $request->address;
+
+      // status = 0: đơn đã tạo nhưng chưa thanh toán thành công
+      $order->status = 0;
+      $order->save();
+
+      foreach ($cart->items as $key => $item) {
         $order_details = new OrderDetail;
         $order_details->order_id = $order->id;
-        $order_details->product_detail_id = $request->product_id;
-        $order_details->quantity = $request->totalQty;
-        $order_details->price = $request->price;
+        $order_details->product_detail_id = $item['item']->id;
+        $order_details->quantity = $item['qty'];
+        $order_details->price = $item['price'];
         $order_details->save();
-
-        // Tạo url thanh toán
-        $receiver = env('RECEIVER');
-        $order_code = $order->order_code;
-        $return_url = route('payment_response');
-        $cancel_url = route('payment_response');
-        $notify_url = route('payment_response');
-        $transaction_info = $order->id;
-        $currency = "vnd";
-        $quantity = $request->totalQty;
-        $price = $order_details->price * $order_details->quantity;
-        $tax =0;
-        $discount =0;
-        $fee_cal =0;
-        $fee_shipping =0;
-        $order_description ="Thanh toán đơn hàng ".config('app.name');
-        $buyer_info = $request->name."*|*".$request->email."*|*".$request->phone."*|*".$request->address;
-        $affiliate_code = "";
-
-        $nl= new NL_Checkout();
-        $nl->nganluong_url = env('NGANLUONG_URL');
-        $nl->merchant_site_code = env('MERCHANT_ID');
-        $nl->secure_pass = env('MERCHANT_PASS');
-
-        $url= $nl->buildCheckoutUrlExpand($return_url, $receiver, $transaction_info, $order_code, $price, $currency, $quantity, $tax, $discount , $fee_cal,    $fee_shipping, $order_description, $buyer_info , $affiliate_code);
-        $url .='&cancel_url='. $cancel_url . '&notify_url='.$notify_url;
-
-        return redirect()->away($url);
-      } elseif ($request->buy_method == 'buy_cart') {
-        $cart = Session::get('cart');
-
-        $order = new Order;
-        $order->user_id = Auth::user()->id;
-        $order->payment_method_id = $request->payment_method;
-        $order->order_code = 'PSO'.str_pad(rand(0, pow(10, 5) - 1), 5, '0', STR_PAD_LEFT);
-        $order->name = $request->name;
-        $order->email = $request->email;
-        $order->phone = $request->phone;
-        $order->address = $request->address;
-        $order->status = 0;
-        $order->save();
-
-        foreach ($cart->items as $key => $item) {
-          $order_details = new OrderDetail;
-          $order_details->order_id = $order->id;
-          $order_details->product_detail_id = $item['item']->id;
-          $order_details->quantity = $item['qty'];
-          $order_details->price = $item['price'];
-          $order_details->save();
-        }
-
-        // Tạo url thanh toán
-        $receiver = env('RECEIVER');
-        $order_code = $order->order_code;
-        $return_url = route('payment_response');
-        $cancel_url = route('payment_response');
-        $notify_url = route('payment_response');
-        $transaction_info = $order->id;
-        $currency = "vnd";
-        $quantity = $cart->totalQty;
-        $price = $cart->totalPrice;
-        $tax =0;
-        $discount =0;
-        $fee_cal =0;
-        $fee_shipping =0;
-        $order_description ="Thanh toán đơn hàng ".config('app.name');
-        $buyer_info = $request->name."*|*".$request->email."*|*".$request->phone."*|*".$request->address;
-        $affiliate_code = "";
-
-        $nl= new NL_Checkout();
-        $nl->nganluong_url = env('NGANLUONG_URL');
-        $nl->merchant_site_code = env('MERCHANT_ID');
-        $nl->secure_pass = env('MERCHANT_PASS');
-
-        $url= $nl->buildCheckoutUrlExpand($return_url, $receiver, $transaction_info, $order_code, $price, $currency, $quantity, $tax, $discount , $fee_cal,    $fee_shipping, $order_description, $buyer_info , $affiliate_code);
-        $url .='&cancel_url='. $cancel_url . '&notify_url='.$notify_url;
-
-        Session::forget('cart');
-        return redirect()->away($url);
       }
+
+      $totalAmount = $cart->totalPrice;
+
+      Session::forget('cart');
+
+      return $this->redirectToVnpay($request, $order, $totalAmount);
     }
   }
 
-  public function responsePayment(Request $request) {
-    if ($request->filled('payment_id')) {
+  return redirect()->route('home_page')->with(['alert' => [
+    'type' => 'error',
+    'title' => 'Thông Báo',
+    'content' => 'Không thể xử lý thanh toán.'
+  ]]);
+}
 
-      // Lấy các tham số để chuyển sang Ngânlượng thanh toán:
-      $transaction_info =$request->transaction_info;
-      $order_code =$request->order_code;
-      $price =$request->price;
-      $payment_id =$request->payment_id;
-      $payment_type =$request->payment_type;
-      $error_text =$request->error_text;
-      $secure_code =$request->secure_code;
+private function redirectToVnpay(Request $request, Order $order, $totalAmount)
+{
+    $vnp_Url = trim(env('VNPAY_URL'));
+    $vnp_Returnurl = trim(env('VNPAY_RETURN_URL'));
+    $vnp_TmnCode = trim(env('VNPAY_TMN_CODE'));
+    $vnp_HashSecret = trim(env('VNPAY_HASH_SECRET'));
 
-      //Khai báo đối tượng của lớp NL_Checkout
-      $nl= new NL_Checkout();
-      $nl->merchant_site_code = env('MERCHANT_ID');
-      $nl->secure_pass = env('MERCHANT_PASS');
+    $vnp_TxnRef = $order->order_code;
+    $vnp_OrderInfo = 'Thanh toan don hang ' . $order->order_code;
+    $vnp_OrderType = 'billpayment';
+    $vnp_Amount = (int)$totalAmount * 100;
+    $vnp_Locale = 'vn';
+    $vnp_IpAddr = $request->ip();
 
-      //Tạo link thanh toán đến nganluong.vn
-      $checkpay= $nl->verifyPaymentUrl($transaction_info, $order_code, $price, $payment_id, $payment_type, $error_text, $secure_code);
+    $inputData = [
+        "vnp_Version" => "2.1.0",
+        "vnp_TmnCode" => $vnp_TmnCode,
+        "vnp_Amount" => $vnp_Amount,
+        "vnp_Command" => "pay",
+        "vnp_CreateDate" => date('YmdHis'),
+        "vnp_CurrCode" => "VND",
+        "vnp_IpAddr" => $vnp_IpAddr,
+        "vnp_Locale" => $vnp_Locale,
+        "vnp_OrderInfo" => $vnp_OrderInfo,
+        "vnp_OrderType" => $vnp_OrderType,
+        "vnp_ReturnUrl" => $vnp_Returnurl,
+        "vnp_TxnRef" => $vnp_TxnRef,
+    ];
 
-      if ($checkpay) {
-        $order = Order::where([['id', $transaction_info],['order_code', $order_code]])->first();
-        $order->status = 1;
-        $order->save();
+    ksort($inputData);
 
-        foreach ($order->order_details as $order_detail) {
-          $product_detail = ProductDetail::where('id', $order_detail->product_detail_id)->first();
-          $product_detail->quantity = $product_detail->quantity - $order_detail->quantity;
-          $product_detail->save();
+    $query = "";
+    $hashdata = "";
+    $i = 0;
+
+    foreach ($inputData as $key => $value) {
+        if ($i == 1) {
+            $hashdata .= '&' . urlencode($key) . "=" . urlencode($value);
+        } else {
+            $hashdata .= urlencode($key) . "=" . urlencode($value);
+            $i = 1;
         }
+
+        $query .= urlencode($key) . "=" . urlencode($value) . '&';
+    }
+
+    $vnpSecureHash = hash_hmac('sha512', $hashdata, $vnp_HashSecret);
+
+    $vnp_Url = $vnp_Url . "?" . $query . 'vnp_SecureHash=' . $vnpSecureHash;
+
+    return redirect()->away($vnp_Url);
+}
+
+public function vnpayReturn(Request $request)
+{
+  $vnp_HashSecret = env('VNPAY_HASH_SECRET');
+  $inputData = $request->all();
+
+  $vnp_SecureHash = $inputData['vnp_SecureHash'] ?? '';
+
+  unset($inputData['vnp_SecureHash']);
+  unset($inputData['vnp_SecureHashType']);
+
+  ksort($inputData);
+
+  $hashData = '';
+  foreach ($inputData as $key => $value) {
+    $hashData .= ($hashData ? '&' : '') . urlencode($key) . '=' . urlencode($value);
+  }
+
+  $secureHash = hash_hmac('sha512', $hashData, $vnp_HashSecret);
+
+  if ($secureHash == $vnp_SecureHash) {
+
+    if ($request->vnp_ResponseCode == '00' && $request->vnp_TransactionStatus == '00') {
+
+      $order = Order::where('order_code', $request->vnp_TxnRef)->first();
+
+      if ($order) {
+
+        // Chỉ trừ kho 1 lần, tránh F5 trang return bị trừ tồn kho nhiều lần
+        if ($order->status != 1) {
+          $order->status = 1;
+          $order->save();
+
+          foreach ($order->order_details as $order_detail) {
+            $product_detail = ProductDetail::where('id', $order_detail->product_detail_id)->first();
+
+            if ($product_detail) {
+              $product_detail->quantity = $product_detail->quantity - $order_detail->quantity;
+              $product_detail->save();
+            }
+          }
+          $this->sendOrderSuccessMail($order);
+        }
+
         return redirect()->route('home_page')->with(['alert' => [
           'type' => 'success',
-          'title' => 'Thanh toán thành công!',
-          'content' => 'Cảm ơn bạn đã tin tưởng và lựa chọn chúng tối.'
-        ]]);
-      }else{
-        return redirect()->route('home_page')->with(['alert' => [
-          'type' => 'error',
-          'title' => 'Thanh toán không thành công!',
-          'content' => $error_text
+          'title' => 'Thanh toán thành công',
+          'content' => 'Đơn hàng của bạn đã được thanh toán thành công qua VNPAY.'
         ]]);
       }
-    } else {
+
       return redirect()->route('home_page')->with(['alert' => [
         'type' => 'error',
-        'title' => 'Thanh toán không thành công!',
-        'content' => 'Bạn đã hủy hoặc đã xẩy ra lỗi trong quá trình thanh toán.'
+        'title' => 'Không tìm thấy đơn hàng',
+        'content' => 'Không tìm thấy đơn hàng tương ứng với giao dịch VNPAY.'
+      ]]);
+
+    } else {
+
+      return redirect()->route('home_page')->with(['alert' => [
+        'type' => 'error',
+        'title' => 'Thanh toán thất bại',
+        'content' => 'Giao dịch VNPAY không thành công hoặc đã bị hủy.'
       ]]);
     }
   }
+
+  return redirect()->route('home_page')->with(['alert' => [
+    'type' => 'error',
+    'title' => 'Lỗi xác thực thanh toán',
+    'content' => 'Chữ ký thanh toán VNPAY không hợp lệ.'
+  ]]);
+}
+private function sendOrderSuccessMail(Order $order)
+{
+    $order->load('order_details.product_detail.product', 'payment_method');
+
+    try {
+        Mail::to($order->email)->send(new OrderSuccessMail($order));
+    } catch (\Exception $e) {
+        Log::error('Lỗi gửi email đơn hàng: ' . $e->getMessage());
+    }
+}
+  public function responsePayment(Request $request) {
+  return redirect()->route('home_page')->with(['alert' => [
+    'type' => 'info',
+    'title' => 'Thông Báo',
+    'content' => 'Chức năng thanh toán Ngân Lượng đã được thay bằng VNPAY.'
+  ]]);
+}
 }

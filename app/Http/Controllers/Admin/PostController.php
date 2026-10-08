@@ -16,23 +16,28 @@ class PostController extends Controller
   public function index(Request $request)
   {
     $posts = Post::select('id', 'title', 'image', 'created_at')->latest()->get();
+
     return view('admin.post.index')->with('posts', $posts);
   }
+
   public function new(Request $request)
   {
     return view('admin.post.new');
   }
+
   public function save(Request $request)
   {
-
     $validator = Validator::make($request->all(), [
       'title' => 'required',
       'content' => 'required',
-      'image' => 'required',
+      'image' => 'required|image|mimes:jpg,jpeg,png,webp|max:5120',
     ], [
       'title.required' => 'Tiêu đề bài viết không được để trống!',
       'content.required' => 'Nội dung bài viết không được để trống!',
       'image.required' => 'Hình ảnh hiển thị bài viết phải được tải lên!',
+      'image.image' => 'File tải lên phải là hình ảnh!',
+      'image.mimes' => 'Hình ảnh phải có định dạng jpg, jpeg, png hoặc webp!',
+      'image.max' => 'Dung lượng hình ảnh không được vượt quá 5MB!',
     ]);
 
     if ($validator->fails()) {
@@ -41,58 +46,17 @@ class PostController extends Controller
         ->withInput();
     }
 
-    //Xử lý Ảnh trong nội dung
-    $content = $request->content;
-
-    $dom = new \DomDocument();
-
-    // conver utf-8 to html entities
-    $content = mb_convert_encoding($content, 'HTML-ENTITIES', "UTF-8");
-
-    $dom->loadHtml($content, LIBXML_HTML_NODEFDTD);
-
-    $images = $dom->getElementsByTagName('img');
-
-    foreach($images as $k => $img){
-
-        $data = $img->getAttribute('src');
-
-        if(Str::containsAll($data, ['data:image', 'base64'])){
-
-            list(, $type) = explode('data:image/', $data);
-            list($type, ) = explode(';base64,', $type);
-
-            list(, $data) = explode(';base64,', $data);
-
-            $data = base64_decode($data);
-
-            $image_name= time().$k.'.'.$type;
-
-            Storage::disk('public')->put('images/posts/'.$image_name, $data);
-
-            $img->removeAttribute('src');
-            $img->setAttribute('src', '/storage/images/posts/'.$image_name);
-        }
-    }
-
-    $content = $dom->saveHTML();
-
-    //conver html-entities to utf-8
-    $content = mb_convert_encoding($content, "UTF-8", 'HTML-ENTITIES');
-
-    //get content
-    list(, $content) = explode('<html><body>', $content);
-    list($content, ) = explode('</body></html>', $content);
-
     $post = new Post;
     $post->title = $request->title;
-    $post->content = $content;
+    $post->content = $this->handleEditorContentImages($request->content);
     $post->user_id = Auth::user()->id;
 
-    if($request->hasFile('image')){
+    if ($request->hasFile('image')) {
       $image = $request->file('image');
-      $image_name = time().'_'.$image->getClientOriginalName();
-      $image->storeAs('images/posts',$image_name,'public');
+      $image_name = time() . '_' . Str::random(8) . '_' . $image->getClientOriginalName();
+
+      $image->storeAs('images/posts', $image_name, 'public');
+
       $post->image = $image_name;
     }
 
@@ -109,34 +73,26 @@ class PostController extends Controller
   {
     $post = Post::where('id', $request->post_id)->first();
 
-    if(!$post) {
-
+    if (!$post) {
       $data['type'] = 'error';
       $data['title'] = 'Thất Bại';
       $data['content'] = 'Bạn không thể xóa bài viết không tồn tại!';
     } else {
       Storage::disk('public')->delete('images/posts/' . $post->image);
-      if($post->content != null) {
-        $dom = new \DomDocument();
 
-        // conver utf-8 to html entities
-        $content = mb_convert_encoding($post->content, 'HTML-ENTITIES', "UTF-8");
-
-        $dom->loadHtml($content, LIBXML_HTML_NODEFDTD | LIBXML_NOERROR);
+      if ($post->content != null) {
+        $dom = $this->loadEditorHtml($post->content);
 
         $images = $dom->getElementsByTagName('img');
 
-        foreach($images as $img){
+        foreach ($images as $img) {
+          $src = $img->getAttribute('src');
 
-            $src = $img->getAttribute('src');
-            $src = mb_convert_encoding($src, "UTF-8", 'HTML-ENTITIES');
+          if (Str::startsWith($src, '/storage/images/posts/')) {
+            $src = str_replace('/storage/', '', $src);
 
-            if(Str::startsWith($src, '/storage/images/posts/')){
-
-                list(, $src) = explode('/storage/', $src);
-
-                Storage::disk('public')->delete($src);
-            }
+            Storage::disk('public')->delete($src);
+          }
         }
       }
 
@@ -153,17 +109,24 @@ class PostController extends Controller
   public function edit($id)
   {
     $post = Post::where('id', $id)->first();
-    if(!$post) abort(404);
+
+    if (!$post) abort(404);
+
     return view('admin.post.edit')->with('post', $post);
   }
+
   public function update(Request $request, $id)
   {
     $validator = Validator::make($request->all(), [
       'title' => 'required',
       'content' => 'required',
+      'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
     ], [
       'title.required' => 'Tiêu đề bài viết không được để trống!',
       'content.required' => 'Nội dung bài viết không được để trống!',
+      'image.image' => 'File tải lên phải là hình ảnh!',
+      'image.mimes' => 'Hình ảnh phải có định dạng jpg, jpeg, png hoặc webp!',
+      'image.max' => 'Dung lượng hình ảnh không được vượt quá 5MB!',
     ]);
 
     if ($validator->fails()) {
@@ -172,58 +135,23 @@ class PostController extends Controller
         ->withInput();
     }
 
-    //Xử lý Ảnh trong nội dung
-    $content = $request->content;
-
-    $dom = new \DomDocument();
-
-    // conver utf-8 to html entities
-    $content = mb_convert_encoding($content, 'HTML-ENTITIES', "UTF-8");
-
-    $dom->loadHtml($content, LIBXML_HTML_NODEFDTD);
-
-    $images = $dom->getElementsByTagName('img');
-
-    foreach($images as $k => $img){
-
-        $data = $img->getAttribute('src');
-
-        if(Str::containsAll($data, ['data:image', 'base64'])){
-
-            list(, $type) = explode('data:image/', $data);
-            list($type, ) = explode(';base64,', $type);
-
-            list(, $data) = explode(';base64,', $data);
-
-            $data = base64_decode($data);
-
-            $image_name= time().$k.'.'.$type;
-
-            Storage::disk('public')->put('images/posts/'.$image_name, $data);
-
-            $img->removeAttribute('src');
-            $img->setAttribute('src', '/storage/images/posts/'.$image_name);
-        }
-    }
-
-    $content = $dom->saveHTML();
-
-    //conver html-entities to utf-8
-    $content = mb_convert_encoding($content, "UTF-8", 'HTML-ENTITIES');
-
-    //get content
-    list(, $content) = explode('<html><body>', $content);
-    list($content, ) = explode('</body></html>', $content);
-
     $post = Post::where('id', $id)->first();
-    $post->title = $request->title;
-    $post->content = $content;
 
-    if($request->hasFile('image')){
+    if (!$post) abort(404);
+
+    $post->title = $request->title;
+    $post->content = $this->handleEditorContentImages($request->content);
+
+    if ($request->hasFile('image')) {
       $image = $request->file('image');
-      $image_name = time().'_'.$image->getClientOriginalName();
-      $image->storeAs('images/posts',$image_name,'public');
-      Storage::disk('public')->delete('images/posts/' . $post->image);
+      $image_name = time() . '_' . Str::random(8) . '_' . $image->getClientOriginalName();
+
+      $image->storeAs('images/posts', $image_name, 'public');
+
+      if ($post->image != null) {
+        Storage::disk('public')->delete('images/posts/' . $post->image);
+      }
+
       $post->image = $image_name;
     }
 
@@ -234,5 +162,84 @@ class PostController extends Controller
       'title' => 'Thành Công',
       'content' => 'Chỉnh sửa bài viết thành công.'
     ]]);
+  }
+
+  private function handleEditorContentImages($html)
+  {
+    $dom = $this->loadEditorHtml($html);
+
+    $images = $dom->getElementsByTagName('img');
+
+    foreach ($images as $k => $img) {
+      $data = $img->getAttribute('src');
+
+      if (Str::containsAll($data, ['data:image', 'base64'])) {
+        if (!preg_match('/^data:image\/(\w+);base64,/', $data, $matches)) {
+          continue;
+        }
+
+        $type = strtolower($matches[1]);
+
+        if ($type === 'jpeg') {
+          $type = 'jpg';
+        }
+
+        $base64Data = preg_replace('/^data:image\/\w+;base64,/', '', $data);
+        $base64Data = str_replace(' ', '+', $base64Data);
+
+        $imageData = base64_decode($base64Data);
+
+        if ($imageData === false) {
+          continue;
+        }
+
+        $image_name = time() . $k . '_' . Str::random(8) . '.' . $type;
+
+        Storage::disk('public')->put('images/posts/' . $image_name, $imageData);
+
+        $img->removeAttribute('src');
+        $img->setAttribute('src', '/storage/images/posts/' . $image_name);
+      }
+    }
+
+    return $this->getBodyContent($dom);
+  }
+
+  private function loadEditorHtml($html)
+  {
+    $dom = new \DOMDocument('1.0', 'UTF-8');
+
+    libxml_use_internal_errors(true);
+
+    $html = '<?xml encoding="UTF-8">' .
+      '<!DOCTYPE html>' .
+      '<html>' .
+      '<head><meta charset="UTF-8"></head>' .
+      '<body>' . $html . '</body>' .
+      '</html>';
+
+    $dom->loadHTML(
+      $html,
+      LIBXML_HTML_NODEFDTD | LIBXML_NOERROR | LIBXML_NOWARNING
+    );
+
+    libxml_clear_errors();
+
+    return $dom;
+  }
+
+  private function getBodyContent($dom)
+  {
+    $body = $dom->getElementsByTagName('body')->item(0);
+
+    $content = '';
+
+    if ($body) {
+      foreach ($body->childNodes as $child) {
+        $content .= $dom->saveHTML($child);
+      }
+    }
+
+    return $content;
   }
 }

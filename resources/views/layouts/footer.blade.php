@@ -9,7 +9,7 @@
             </div>
             <div class="widget-content">
               <p><b><i class="fas fa-mobile-alt"></i> Hotline:</b> <a href="tel:(+84) 343754517">(+84) 343754517</a></p>
-              <p><b><i class="fas fa-envelope"></i> Email:</b> <a href="mailto:thanhtrung@gmail.com" rel="nofollow">thanhtrung@gmail.com</a></p>
+              <p><b><i class="fas fa-envelope"></i> Email:</b> <a href="mailto:thanhtrung@gmail.com" rel="nofollow">lequocan124@gmail.com</a></p>
               <p><b><i class="fas fa-store-alt"></i> Địa chỉ:</b> Phường 25 - Bình Thạnh - Hồ Chí Minh</p>
             </div>
           </div>
@@ -65,7 +65,7 @@
   </div>
   <div class="footer-bottom">
     <div class="copyright text-center">
-      Copyright &copy 2023 Nguyễn Thành Trung. All rights reserved.
+      Copyright &copy 2026 Lê Quốc An. All rights reserved.
     </div>
   </div>
 </footer>

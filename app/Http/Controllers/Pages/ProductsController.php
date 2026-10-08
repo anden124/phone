@@ -14,7 +14,11 @@ use App\Models\ProductVote;
 
 class ProductsController extends Controller
 {
-  public function index(Request $request) {
+  public function index(Request $request) { //Lọc sản phẩm theo type=promotion hoặc tồn kho
+//Lọc theo name, OS, price
+//Sắp xếp theo giá, vote
+//Lấy quảng cáo và nhà sản xuất
+//Trả về view pages.products
 
     if($request->has('type') && $request->input('type') == 'promotion') {
       $query_products = Product::whereHas('product_detail', function (Builder $query) {
@@ -67,7 +71,11 @@ class ProductsController extends Controller
     return view('pages.products')->with(['data' => ['advertises' => $advertises, 'producers' => $producers, 'products' => $products]]);
   }
 
-  public function getProducer(Request $request, $id) {
+
+
+  public function getProducer(Request $request, $id) { //Tương tự index() nhưng thêm điều kiện theo producer_id
+//Lấy producer hiện tại
+//Trả về view pages.producer
 
     if($request->has('type') && $request->input('type') == 'promotion') {
       $query_products = Product::whereHas('product_detail', function (Builder $query) {
@@ -123,7 +131,12 @@ class ProductsController extends Controller
     return view('pages.producer')->with(['data' => ['advertises' => $advertises, 'producers' => $producers, 'products' => $products], 'producer' => $producer]);
   }
 
-  public function getProduct(Request $request, $id) {
+
+
+  public function getProduct(Request $request, $id) { //Lấy chi tiết sản phẩm, khuyến mãi, nhà sản xuất
+//Lấy biến thể sản phẩm và sản phẩm gợi ý
+//Lấy đánh giá sản phẩm
+//Trả về view pages.product
 
     $advertises = Advertise::where([
       ['start_date', '<=', date('Y-m-d')],
@@ -170,7 +183,12 @@ class ProductsController extends Controller
     return view('pages.product')->with(['data' => ['advertises' => $advertises, 'product' => $product, 'product_details' => $product_details, 'suggest_products' => $suggest_products, 'product_votes' => $product_votes]]);
   }
 
-  public function addVote(Request $request) {
+
+
+
+  public function addVote(Request $request) { //Cập nhật hoặc tạo vote
+//Tính lại trung bình rate của sản phẩm
+//Lưu sản phẩm và trả về back() với thông báo
     $vote = ProductVote::updateOrCreate(
         ['user_id' => $request->user_id, 'product_id' => $request->product_id],
         ['content' => $request->content, 'rate' => $request->rate]
